@@ -18,7 +18,7 @@ data_wave4 <- read_sas("C:/tilburg university/2022-2023/Thesis/wave_4_supplement
 data_wave5 <- read_sas("C:/tilburg university/2022-2023/Thesis/wave5_supplement_v1_sas/wave5_supplement_v1_sas.sas7bdat")
 #View(data_wave5)
 
-
+# Wave 6 data
 data_wave6 <- read_dta("C:/tilburg university/2022-2023/Thesis/HCMST_wave_6_public_v1_stata/HCMST_wave_6_public_v1.dta")
 #View(data_wave6)
 
@@ -35,7 +35,7 @@ merged_data_all <- subset(merged_data_all, !(qflag == 2))
 
 
 #################
-# creation of the Year and Status columns
+# creation of the Year and Status columns. This is done by determining if a breakup accured during a survey or not.
 
 df_survival <- merged_data_all %>%
   mutate(
@@ -54,11 +54,11 @@ df_survival <- merged_data_all %>%
     Status = ifelse(!is.na(Year), 1, 0) # if Year is NOT empty, a breakup happend (since there is a year assigned to the time variable) -> Status = 1 (else 0).
   )
 
-df_survival$Year[is.na(df_survival$Year)] <- 2017 # if Year is empty NO breakup happanend and the year 2017 is assigned.
+df_survival$Year[is.na(df_survival$Year)] <- 2017 # if Year is empty NO breakup happend and the year 2017 is assigned.
 #View(df_survival)
   
 #################
-write.table(df_survival, file="df_survival_Rcode2.csv", sep=",", row.names=FALSE, quote=FALSE)
+#write.table(df_survival, file="df_survival_Rcode2.csv", sep=",", row.names=FALSE, quote=FALSE)
 
 
 
