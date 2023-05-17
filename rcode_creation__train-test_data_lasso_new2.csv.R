@@ -1,6 +1,4 @@
-# all code used
 
-# reduce high dimension file ---------------------------------------------------
 
 # Load necessary libraries
 library(dplyr)
@@ -52,25 +50,24 @@ for (namecol in colnames(lowdim_dataset)) {
   }
   # check if the column name ends with "cat"
   if (grepl("cat$", namecol)) {
-    # add the matching column name to the list
+    # add the matching column name to the list if it end with "cat"
     cat_columns <- append(cat_columns, namecol)
     modified_lowdim_dataset[[namecol]] <- as.factor(modified_lowdim_dataset[[namecol]])
     next
   }
-  if (!namecol  %in% not_cat_columns){
+  if (!namecol  %in% not_cat_columns){ # if column name not in not_cat_columns, add it to cat_columns
     cat_columns <- append(cat_columns, namecol)
     modified_lowdim_dataset[[namecol]] <- as.factor(modified_lowdim_dataset[[namecol]])
   }
 }
 
 
-# LASSO+COX cleaned file --------------------------------------------------
-
+# only include columns from wave 1
 modified_lowdim_dataset2 <- modified_lowdim_dataset
 modified_lowdim_dataset2 <- modified_lowdim_dataset2[, c(1:which(names(modified_lowdim_dataset2) == "coresident"), 
                                                          (ncol(modified_lowdim_dataset2)-1):ncol(modified_lowdim_dataset2))]
 
-ncol(modified_lowdim_dataset2)
+
 # ----------------------------------------------------------
 
 # STEP 1: Dummy coding
@@ -84,23 +81,23 @@ cat_cols <- names(cat_vars)[cat_vars & !names(cat_vars) %in% c("Status", "Year")
 
 # % cat cols ------------------------
 
-# # Count the number of categorical columns
-# num_cat_cols <- sum(cat_vars & !names(cat_vars) %in% c("Status", "Year"))
-# 
-# # Count the total number of columns
-# num_total_cols <- ncol(modified_lowdim_dataset2)
-# 
-# # Calculate the percentage of categorical columns
-# perc_cat_cols <- num_cat_cols / num_total_cols * 100
-# 
-# # Print the percentage of categorical columns
-# cat(sprintf("%.2f%% of columns are categorical", perc_cat_cols))
-# print(num_total_cols)
+# Count the number of categorical columns
+num_cat_cols <- sum(cat_vars & !names(cat_vars) %in% c("Status", "Year"))
+
+# Count the total number of columns
+num_total_cols <- ncol(modified_lowdim_dataset2)
+
+# Calculate the percentage of categorical columns
+perc_cat_cols <- num_cat_cols / num_total_cols * 100
+
+# Print the percentage of categorical columns
+cat(sprintf("%.2f%% of columns are categorical", perc_cat_cols))
+
 #------------------------------------------
 
 
 
-# Check for columns with multiple levels and combine infrequent levels
+# Check for columns with multiple levels (more than 5) and combine infrequent levels
 for (colname in names(modified_lowdim_dataset2)) {
   if (is.factor(modified_lowdim_dataset2[[colname]]) && nlevels(modified_lowdim_dataset2[[colname]]) > 5) {
     freq_levels <- names(sort(table(modified_lowdim_dataset2[[colname]]), decreasing = TRUE)[1:9])
@@ -114,17 +111,17 @@ for (colname in names(modified_lowdim_dataset2)) {
 # Create dummy variables for categorical columns using dummyVars()
 dummy_transform <- dummyVars(~ ., data = modified_lowdim_dataset2[, cat_cols],fullRank = TRUE)
 
-# Use predict() function to create dummy variables on modified dataset
+# Use predict() function to create dummy variables 
 dummy_cols <- predict(dummy_transform, newdata = modified_lowdim_dataset2[, cat_cols])
-ncol(dummy_cols) #384 cols
+#ncol(dummy_cols) #384 cols
 #________________________________________________________________________
 # STEP 2: preprocess numeric values excluding year and status:
 
 numeric_only <- modified_lowdim_dataset2[, -which(names(modified_lowdim_dataset2) %in% c(cat_cols,"Year.1", "Status.1","caseid_new","Year","Status"))]
-#View(numeric_only)#36
+#View(numeric_only)#36 cols
 
 #_______________________________________________
-# STEP 2.1: impute missing values for numeric only cols (NOT THE DUMMY VARIABLES)
+# STEP 2.1: impute missing values for only numeric cols (NOT THE DUMMY VARIABLES)
 
 numeric_only <- as.data.frame(numeric_only)
 
@@ -133,7 +130,7 @@ for(c in 1:(ncol(numeric_only))) {
   numeric_only[which(is.na(numeric_only[c])),c] = median
 }
 #___________________________________________________________
-#transformation
+#transformation of the numeric cols
 
 abnormal_columns = c("pphouseholdsize","ppt01","duration","ppt612","children_in_hh","q16","how_long_ago_first_met",
                      "how_long_ago_first_romantic","how_long_ago_first_cohab","how_long_relationship","age_difference","ppcmarit_2009_yrmo")
@@ -153,7 +150,7 @@ numeric_only$how_long_relationship = log(numeric_only$how_long_relationship+0.00
 numeric_only$age_difference = log(numeric_only$age_difference+0.001) #0
 
 
-View(numeric_only)
+#View(numeric_only)
 
 #___________________________________________________________
 
@@ -161,14 +158,13 @@ View(numeric_only)
 preproc <- preProcess(numeric_only, method=c("center", "scale"))
 encoded_data_processed <- predict(preproc, numeric_only)
 
-#--------------------
 
 
 #------------------------------------------
-#STEP 3: Combine the processed numeric variables with the categorical variables and Year and Status columns
+#STEP 3: Combine the processed numeric variables with the dummy variables and Year and Status columns
 
 encoded_data_final <- cbind(numeric_only, dummy_cols,modified_lowdim_dataset2[, c("Status", "Year")])
-ncol(encoded_data_final)#422
+#ncol(encoded_data_final)#422 cols
 #_______________________________________________
 # STEP 3.1: impute missing values for dummy variables as well
 
@@ -180,10 +176,8 @@ for(c in 1:(ncol(encoded_data_final))) {
 }
 #___________________________________________________________
 
-
-# ---------------------------------------------------------------------------
 # Check the number of non-majority values with status 1
-# Keep data point only if this is higher than or equal to some threshold, for instance 15
+# Keep data point only if this is higher than or equal to treshold 15
 keep = vector()
 for(i in 1:(ncol(encoded_data_final)-3)) {
   # Check the number of non-majority values with status 1
@@ -195,7 +189,6 @@ keep = which(keep)
 
 # STEP 4: split in train and test set:
 
-#write.csv(encoded_data_final, file = "encoded_data_final.csv", row.names = FALSE)
 
 set.seed(1)
 encoded_data_final$Class = as.factor(paste(encoded_data_final$Status, encoded_data_final$Year, sep = "!"))
@@ -206,24 +199,18 @@ test.x = encoded_data_final[-train_id, keep]
 train.y = Surv(encoded_data_final[train_id,]$Year, encoded_data_final[train_id,]$Status)
 test.y = Surv(encoded_data_final[-train_id,]$Year, encoded_data_final[-train_id,]$Status)
 
-ncol(train.x)
 
 train_data <- cbind(train.x, train.y)
 
-ncol(train_data) #303This has been d
+#ncol(train_data) #303
 
 test_data <- cbind(test.x, encoded_data_final[-train_id,]$Year,encoded_data_final[-train_id,]$Status)
 colnames(test_data)[ncol(test_data)-1] <- "time"
 colnames(test_data)[ncol(test_data)] <- "status"
 
-dim(train_data)
-dim(test_data)
-
-# write.csv(train_data, file = "new_train_data.csv", row.names = FALSE)
-# write.csv(test_data, file = "new_test_data.csv", row.names = FALSE)
 
 # -----------------------------------------------------------------------------------
-# STEP 5: run lasso model with cross-validation (MATRIX IS NEEDED FOR GLMNET):
+# STEP 5: run lasso model with cross-validation :
 
 cox.cv = cv.glmnet(train.x, train.y, alpha = 1, family = "cox")
 
@@ -254,29 +241,20 @@ selected_columns <- colnames(selected_predictors_train_new)
 
 #View(selected_predictors_train_new)
 
-ncol(selected_predictors_train_new)
-ncol(selected_predictors_test_new)
-# print(selected_columns)
 #____________________________________
 
 
-# Fit Cox regression model with selected predictors. to do: used train instead of test.
+# Fit Cox regression model with selected predictors. .
 cox_model_train <- coxph(train.y ~ ., data = selected_predictors_train_new)
-cox_model_test <- coxph(test.y ~ ., data = selected_predictors_test_new)
 
 
 # Print summary of the Cox regression model
 summary(cox_model_train)
-summary(cox_model_test)
 #__________________________________________________________
 
 # Check PH assumption using cox.zph() function
 cox_model_zph <- cox.zph(cox_model_train)
 cox_model_zph
-
-table(encoded_data_final$Status, encoded_data_final$ppmarit.1)
-
-# RSF Model ---------------------------------------------------------------
 
 
 #_____________________________________
@@ -284,139 +262,21 @@ table(encoded_data_final$Status, encoded_data_final$ppmarit.1)
 
 selected_columns_rsf <- c(selected_columns, "time", "status")
 
-# make sure data includes same predictor variables PLUS time and status (to do: correct?)
+# make sure data includes same predictor variables PLUS time and status 
 train_data_lasso <- train_data[, c(selected_columns_rsf)]
 test_data_lasso <- test_data[, c(selected_columns_rsf)]
-test_data_subset <- subset(test_data_lasso, select = -c(time, status))
 
-
-
+# delete columns because of correlation of 1.
 test_data_lasso <- subset(test_data_lasso, select = -c(s1.2, q34.4, q34.3))
-
 train_data_lasso <- subset(train_data_lasso, select = -c(s1.2, q34.4, q34.3))
 
-# 
-ncol(train_data_lasso)
-ncol(test_data_lasso)
+# # 
+# ncol(train_data_lasso) # 33
+# ncol(test_data_lasso) # 33
 
-dim(train_data_lasso)
-
-
-#
-write.csv(train_data_lasso, file = "train_data_lasso_new2.csv", row.names = FALSE)
-write.csv(test_data_lasso, file = "test_data_lasso_new2.csv", row.names = FALSE)
-#___________________________________________
-# multiple tries to get the gridsearch for rsf:
-
-# Define the search grid for ntree and nodesize
-ntree_grid <- seq(50, 500, by = 50)
-nodesize_grid <- seq(2, 10, by = 2)
-
-# Run the grid search using tuneRF()
-tuned_model <- tuneRF(train_data_lasso[, -c("time", "status")], Surv(train_data_lasso$time, train_data_lasso$status), 
-                      ntreeTry = ntree_grid, nodesizeTry = nodesize_grid)
-
-#$$$$$$$$$$$$$$$$$$
-
-
-# Define the search grid for ntree and nodesize
-ntree_grid <- seq(50, 500, by = 50)
-nodesize_grid <- seq(2, 10, by = 2)
-grid <- expand.grid(.ntree = ntree_grid, .nodesize = nodesize_grid)
-
-# Define the training control parameters
-ctrl <- trainControl(method = "cv", number = 10, verboseIter = TRUE, 
-                     allowParallel = TRUE, # enable parallel processing if available
-                     classProbs = TRUE, # enable probability estimates for binary classification
-                     summaryFunction = twoClassSummary) # use the two-class summary function for binary classification
-
-# Add rfsrc to the caret library
-getModelInfo("rfsrc", regex = FALSE)[[1]]$library <- "randomForestSRC"
-
-# Train and tune the RSF model using 10-fold cross-validation
-model <- train(
-  Surv(time, status) ~ .,
-  data = train_data_lasso,
-  method = "rfsrc",
-  ntree = grid$.ntree,
-  nodesize = grid$.nodesize,
-  tuneGrid = grid,
-  trControl = ctrl
-)
-
-
-# Print the results
-print(tuned_model)
-
-#$$$$$$$$$$$$$$$$$
-
-
-# Fit the RSF model with train data were time and status are included ?! to do
-
-rsf_model_train <- rfsrc(Surv(time, status) ~ ., data = train_data_lasso, ntree = 100, nodesize = 5)
-rsf_model_test <- rfsrc(Surv(time, status) ~ ., data = test_data_lasso, ntree = 100, nodesize = 5) 
-
-summary(rsf_model_train)
-summary(rsf_model_test)
-
-# options to get the c-index en the brier score for rsf:
-
-# option 1 __________________________________________________
-
-mat_rsf = predict(rsf_model, test_data_lasso)$survival
-
-dis_time = rsf_model$time.interest
-
-#calculate the C index
-#med_index = median(1:length(dis_time))
-med_index = 2
-surv_obj = Surv(test_data$time, test_data$status)
-
-#C index for RSF
-metrics_rsf[i] = Cindex(surv_obj, predicted = mat_rsf[, med_index])
-
-
-t_star = median(rsf_model$time.interest)
-
-#Brier Score for RSF
-metrics_rsf[i] = Brier(surv_obj, pre_sp = mat_rsf[, med_index], t_star)
-
-
-# Install the devtools package
-install.packages("devtools")
-
-# Install the development version of the ibs package from GitHub
-devtools::install_github("drizopoulos/ibs")
-#IBS for RSF
-metrics_rsf[i] = ibs::IBS(surv_obj, sp_matrix = mat_rsf, dis_time)
-
-
-# Calculate the Brier score
-brier_rsf <- pec(Surv(test_data_lasso$time, test_data_lasso$status), mat_rsf, dis_time)
-
-# option 2________________________________________________________________
-
-# Make predictions on the test set
-
-test_pred <- predict(rsf_model, newdata = test_data_subset, type = "risk")
-print(test_pred)
-
-# Calculate the c-index
-cindex <- rcorr.cens(test_pred, test_data_lasso$time, test_data_lasso$status)$Cindex
-
-#of
-
-cindex2 <- concordance(Surv(time, status) ~predict(rsf_model), test_data_lasso)
-
-# Print the c-index
-cat("C-index:", cindex)
-
-
-# compute the Brier score for the RSF model predictions
-brier_score <- pec::brier_score(test_pred, test_data_lasso$time, test_data_lasso$status)
-
-# print the Brier score
-print(brier_score)
+# #
+# write.csv(train_data_lasso, file = "train_data_lasso_new2.csv", row.names = FALSE)
+# write.csv(test_data_lasso, file = "test_data_lasso_new2.csv", row.names = FALSE)
 
 
 
