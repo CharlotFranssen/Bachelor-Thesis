@@ -6,9 +6,7 @@ library(ggplot2)
 
 setwd("C:/tilburg university/2022-2023/Thesis/")
 
-dataset <- read_csv("C:/tilburg university/2022-2023/Thesis/df_survival.csv")
 dataset_rcode <- read_csv("C:/tilburg university/2022-2023/Thesis/df_survival_RCode.csv")
-View(dataset_rcode)
 
 
 #############
@@ -51,8 +49,6 @@ df_survival$StatusCat = as.factor(df_survival$Status)
 # Rename the values in Status to be more informative
 levels(df_survival$StatusCat) <- c("No Breakup", "Breakup")
 
-# Ik heb Year ook in een factor veranderd, zodat hij jaren waarin geen surveys
-# waren niet plot
 df_survival$YearCat = factor(df_survival$Year, levels = as.character(2010:2017))
 
 # Stacked bar plot
