@@ -13,8 +13,8 @@ setwd("C:/tilburg university/2022-2023/Thesis/")
 # Load data
 train_data_lasso = read.csv("train_data_lasso_new2.csv")
 test_data_lasso = read.csv("test_data_lasso_new2.csv")
-surv <- read.csv("surv_new.csv")
-surv_test <- read.csv("surv_new_test_0.787.csv")
+surv_test <- read.csv("surv_new_test_1.csv")
+
 
 View(test_data_lasso)
 ncol(train_data_lasso)
@@ -24,10 +24,11 @@ ncol(train_data_lasso)
 
 
 
-
 # Run models on train data sets with selected predictors from LASSO
-mod.rsf = rfsrc(Surv(time,status)~., data = train_data_lasso, ntree = 600)
+mod.rsf = rfsrc(Surv(time,status)~., data = train_data_lasso, ntree = 600, importance = TRUE)
 mod.cox = coxph(Surv(time, status) ~ ., data = train_data_lasso, x = TRUE)
+
+
 
 # check ph assumption
 cox_model_zph <- cox.zph(mod.cox)
@@ -56,7 +57,7 @@ Cindex(y.obs, predicted = mat.cox[, 4])
 Cindex(y.obs, predicted = mat.rsf[, 4])
 # # 0.795166   
 Cindex(y.obs, predicted = mat.surv[, 4])
-# 0.769947  
+# 0.780 
 
 # Calculate Brier scores for each time point
 brier.cox = vector()
@@ -84,18 +85,31 @@ for(i in 1:length(dis.time)) {
 names(brier.surv) = dis.time
 brier.surv
 # 2010      2011      2013      2014      2015      2017 
-# 0.001471 0.065630 0.070592 0.122888 0.122462 8.436572 
+# 0.006728 0.075296 0.105734 0.117053 0.125589 1.499611 
 
 # Calculate integrated Brier scores (IBS)
 IBS(y.obs, mat.cox, dis.time)
-# 0.087047 
+# 0.087 
 IBS(y.obs, mat.rsf, dis.time)
-# 0.085514 
+# 0.086 
 IBS(y.obs, mat.surv, dis.time)
-# 0.081591  
+# 0.090  
+
+#___________________________________________________________________________
+
+# variable importance for RSF model
+
+var_importance <- mod.rsf$importance
+
+# Sort the variable importance in descending order
+sorted_importance <- sort(var_importance, decreasing = TRUE)
+
+# Get the top 5 most important predictors
+top_5_predictors <- names(sorted_importance)[1:5]
+
+# Create a dataframe with the top 5 predictors and their corresponding importance values
+top_5_df <- data.frame(Predictor = top_5_predictors, Importance = sorted_importance[1:5])
 
 
-
-
-
+write.csv(top_5_df, file = "top_5_predictors.csv", row.names = FALSE)
 
